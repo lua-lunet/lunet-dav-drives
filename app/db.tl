@@ -40,4 +40,20 @@ function DB.exec(sql: string, ...: any): boolean, string
    return true
 end
 
+function DB.open(): pg.Conn, string
+   return pg.open(config())
+end
+
+function DB.query_conn(conn: pg.Conn, sql: string, ...: any): {DB.Row}, string
+   return pg.query(conn, sql, ...)
+end
+
+function DB.exec_conn(conn: pg.Conn, sql: string, ...: any): {string: any}, string
+   return pg.exec(conn, sql, ...)
+end
+
+function DB.close(conn: pg.Conn)
+   pg.close(conn)
+end
+
 return DB

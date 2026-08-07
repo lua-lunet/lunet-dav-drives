@@ -27,7 +27,7 @@ APP_PORT ?= 18080
 SERVER_PID := $(TARGET_DIR)/server.pid
 SERVER_LOG := $(TARGET_DIR)/server.log
 
-.PHONY: help init deps build unit start stop restart status test e2e e2e-up e2e-down db-reset clean
+.PHONY: help init deps check-minio build unit start stop restart status test e2e e2e-up e2e-down db-reset clean
 
 # A bare `make` explains itself rather than doing anything.
 .DEFAULT_GOAL := help
@@ -38,7 +38,7 @@ SERVER_LOG := $(TARGET_DIR)/server.log
 # values must reach recipe subprocesses rather than staying make-only.
 export APP_HOST APP_PORT
 export PGHOST PGPORT PGDATABASE PGUSER PGPASSWORD
-export MINIO_ENDPOINT MINIO_ROOT_USER MINIO_ROOT_PASSWORD
+export MINIO_ENDPOINT MINIO_ROOT_USER MINIO_ROOT_PASSWORD MINIO_BUCKET MINIO_REGION
 
 help:
 	@printf '%s\n' \
@@ -179,13 +179,21 @@ deps:
 	docker info >/dev/null 2>&1 || fail "the docker daemon is not running; postgres and minio come from e2e/docker-compose.yml"; \
 	echo "deps ok"
 
+# minio is only reachable once the stack is up, so it is checked here rather
+# than in deps, which must stay fast and runnable before anything is running.
+check-minio:
+	@set -e; \
+	curl -fsS "$${MINIO_ENDPOINT}/minio/health/ready" >/dev/null 2>&1 \
+		|| { echo "ERROR: the object store is not answering at $${MINIO_ENDPOINT}"; \
+		     echo "run: make e2e-up   (or: make init)"; exit 1; }
+
 # ---------------------------------------------------------------------------
 # Cyan owns the whole-project compile: Teal in place -> Lua under build/.
 # ---------------------------------------------------------------------------
 build:
 	@set -e; \
 	mkdir -p $(BUILD_DIR); \
-	$(CYAN) build
+	$(CYAN) build --prune
 
 unit: build
 	@set -e; \

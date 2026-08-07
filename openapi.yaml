@@ -1,0 +1,328 @@
+openapi: 3.1.0
+info:
+  title: Lunet Dav Drives API
+  version: 0.1.0
+servers:
+  - url: http://127.0.0.1:18080
+security:
+  - basicAuth: []
+paths:
+  /health:
+    get:
+      responses:
+        "200":
+          description: Service is healthy
+  /v1/me:
+    get:
+      security:
+        - basicAuth: []
+      responses:
+        "200":
+          description: Authenticated user identity
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Me"
+        "401":
+          description: Invalid or missing credentials
+  /v1/drives:
+    get:
+      security:
+        - basicAuth: []
+      responses:
+        "200":
+          description: Drives visible to the authenticated user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DriveList"
+        "401":
+          description: Invalid or missing credentials
+  /v1/drives/{drive_id}:
+    get:
+      security:
+        - basicAuth: []
+      parameters:
+        - $ref: "#/components/parameters/DriveId"
+      responses:
+        "200":
+          description: Drive metadata
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Drive"
+        "404":
+          description: Drive not found or not visible to the authenticated user
+        "401":
+          description: Invalid or missing credentials
+  /v1/drives/{drive_id}/files:
+    get:
+      security:
+        - basicAuth: []
+      parameters:
+        - $ref: "#/components/parameters/DriveId"
+      responses:
+        "200":
+          description: Flat file listing for the drive
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FileList"
+        "404":
+          description: Drive not found or not visible to the authenticated user
+        "401":
+          description: Invalid or missing credentials
+  /v1/drives/{drive_id}/files/{name}:
+    put:
+      security:
+        - basicAuth: []
+      parameters:
+        - $ref: "#/components/parameters/DriveId"
+        - $ref: "#/components/parameters/FileName"
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        "200":
+          description: Created or replaced file metadata
+        "201":
+          description: Created file metadata
+        "404":
+          description: Drive not found or not visible to the authenticated user
+        "409":
+          description: Name occupied when explicit overwrite was not allowed
+        "412":
+          description: Precondition failed
+        "401":
+          description: Invalid or missing credentials
+    get:
+      security:
+        - basicAuth: []
+      parameters:
+        - $ref: "#/components/parameters/DriveId"
+        - $ref: "#/components/parameters/FileName"
+      responses:
+        "200":
+          description: Raw file bytes
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        "404":
+          description: File not found or not visible to the authenticated user
+        "401":
+          description: Invalid or missing credentials
+    head:
+      security:
+        - basicAuth: []
+      parameters:
+        - $ref: "#/components/parameters/DriveId"
+        - $ref: "#/components/parameters/FileName"
+      responses:
+        "200":
+          description: File metadata headers
+        "404":
+          description: File not found or not visible to the authenticated user
+        "401":
+          description: Invalid or missing credentials
+    delete:
+      security:
+        - basicAuth: []
+      parameters:
+        - $ref: "#/components/parameters/DriveId"
+        - $ref: "#/components/parameters/FileName"
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: File not found or not visible to the authenticated user
+        "412":
+          description: Precondition failed
+        "401":
+          description: Invalid or missing credentials
+  /v1/personal/files:
+    get:
+      security:
+        - basicAuth: []
+      responses:
+        "200":
+          description: Personal file listing
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FileList"
+        "401":
+          description: Invalid or missing credentials
+  /v1/personal/files/{name}:
+    put:
+      security:
+        - basicAuth: []
+      parameters:
+        - $ref: "#/components/parameters/FileName"
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        "200":
+          description: Created or replaced personal file metadata
+        "201":
+          description: Created personal file metadata
+        "409":
+          description: Name occupied when explicit overwrite was not allowed
+        "412":
+          description: Precondition failed
+        "401":
+          description: Invalid or missing credentials
+    get:
+      security:
+        - basicAuth: []
+      parameters:
+        - $ref: "#/components/parameters/FileName"
+      responses:
+        "200":
+          description: Raw file bytes
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        "404":
+          description: File not found or not visible to the authenticated user
+        "401":
+          description: Invalid or missing credentials
+    head:
+      security:
+        - basicAuth: []
+      parameters:
+        - $ref: "#/components/parameters/FileName"
+      responses:
+        "200":
+          description: File metadata headers
+        "404":
+          description: File not found or not visible to the authenticated user
+        "401":
+          description: Invalid or missing credentials
+    delete:
+      security:
+        - basicAuth: []
+      parameters:
+        - $ref: "#/components/parameters/FileName"
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: File not found or not visible to the authenticated user
+        "412":
+          description: Precondition failed
+        "401":
+          description: Invalid or missing credentials
+  /v1/personal/files/{name}/move-to-drive:
+    post:
+      security:
+        - basicAuth: []
+      parameters:
+        - $ref: "#/components/parameters/FileName"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MoveToDriveRequest"
+      responses:
+        "200":
+          description: Resulting shared-file metadata
+        "404":
+          description: Source file, target drive, or membership not visible to the authenticated user
+        "409":
+          description: Destination name occupied
+        "412":
+          description: Precondition failed
+        "401":
+          description: Invalid or missing credentials
+components:
+  securitySchemes:
+    basicAuth:
+      type: http
+      scheme: basic
+  parameters:
+    DriveId:
+      name: drive_id
+      in: path
+      required: true
+      schema:
+        type: string
+    FileName:
+      name: name
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 1
+        pattern: "^[^/]+$"
+  schemas:
+    Me:
+      type: object
+      required: [user_id, display_name, email]
+      properties:
+        user_id:
+          type: string
+        display_name:
+          type: string
+        email:
+          type: string
+          format: email
+    Drive:
+      type: object
+      required: [drive_id, name]
+      properties:
+        drive_id:
+          type: string
+        name:
+          type: string
+    DriveList:
+      type: object
+      required: [drives]
+      properties:
+        drives:
+          type: array
+          items:
+            $ref: "#/components/schemas/Drive"
+    File:
+      type: object
+      required: [file_id, name, revision]
+      properties:
+        file_id:
+          type: string
+        name:
+          type: string
+        revision:
+          type: integer
+          minimum: 1
+        mime_type:
+          type: [string, "null"]
+    FileList:
+      type: object
+      required: [files]
+      properties:
+        files:
+          type: array
+          items:
+            $ref: "#/components/schemas/File"
+    MoveToDriveRequest:
+      type: object
+      required: [drive_id]
+      properties:
+        drive_id:
+          type: string
+        name:
+          type: string
+          pattern: "^[^/]+$"

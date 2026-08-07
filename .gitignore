@@ -1,0 +1,26 @@
+# Local configuration, seeded from .env.example by make init.
+.env
+.env.local
+
+# Downloaded toolchain: lunet, hurl, and the luarocks tree. Owned by make init.
+.tools/
+
+# Generated Lua from the Cyan build. Owned by make build.
+build/
+
+# Runtime scratch: server pid, server log, e2e secrets. Owned by make start.
+target/
+
+# Scratch space.
+.tmp/
+tmp/
+e2e/.tmp/
+
+# Coverage output from `tested --coverage`.
+luacov.stats.out
+luacov.report.out
+
+*.log
+
+# macOS
+.DS_Store

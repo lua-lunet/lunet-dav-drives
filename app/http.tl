@@ -14,6 +14,7 @@ local status_text: {integer: string} = {
    [200] = "OK",
    [201] = "Created",
    [204] = "No Content",
+   [207] = "Multi-Status",
    [400] = "Bad Request",
    [401] = "Unauthorized",
    [403] = "Forbidden",
@@ -100,6 +101,45 @@ function Http.decode_path_segment(segment: string): string, string
       end
    end
    return table.concat(out)
+end
+
+-- parse_request keeps the full request-target in req.path, query string and
+-- all; routes that accept query parameters split it off here, on the first
+-- '?'. Returns the bare path and the raw query ("" when there is no '?').
+function Http.split_query(path: string): string, string
+   local at = path:find("?", 1, true)
+   if not at then
+      return path, ""
+   end
+   return path:sub(1, at - 1), path:sub(at + 1)
+end
+
+-- application/x-www-form-urlencoded decoding: '+' means space, THEN percent
+-- triplets decode (so a literal "%2B" survives as '+'). This is deliberately
+-- not decode_path_segment: in path segments '+' is a literal plus, and invalid
+-- percent triplets here are left untouched rather than raising.
+local function form_decode(value: string): string
+   local spaced = value:gsub("%+", " ")
+   return (spaced:gsub("%%(%x%x)", function(hex: string): string
+      return string.char(tonumber(hex, 16) as integer)
+   end))
+end
+
+-- Splits on '&', then on the first '='; a key without '=' gets "". Works for
+-- both request bodies and query strings.
+function Http.parse_form(body: string): {string: string}
+   local out: {string: string} = {}
+   for pair in (body .. "&"):gmatch("(.-)&") do
+      if pair ~= "" then
+         local key, value = pair:match("^([^=]*)=(.*)$")
+         if key then
+            out[form_decode(key)] = form_decode(value)
+         else
+            out[form_decode(pair)] = ""
+         end
+      end
+   end
+   return out
 end
 
 function Http.response(status: integer, headers: {string: string}, body: string): string

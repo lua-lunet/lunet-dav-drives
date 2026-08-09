@@ -1,0 +1,260 @@
+openapi: 3.0.3
+info:
+  title: Dav Drive — Auth & OCS (NCe31 wire subset)
+  version: "0.1.1"
+  description: |
+    Login Flow v2 and OCS user/app-password surface, as actually implemented
+    in app/nc31.lua and covered by specs/loginflow/*.hurl + specs/ocs/*.hurl.
+
+    Scope note: this is the subset Dav Drive speaks, not the full NCe31
+    surface. There is no self-registration, no group/role API, no admin
+    endpoints. Identity is `user_id` (stable, PK); `email`/`display_name`
+    are mutable, non-key.
+servers:
+  - url: http://localhost:8081
+
+paths:
+  /index.php/login/v2:
+    post:
+      summary: Initiate Login Flow v2
+      operationId: loginFlowInit
+      responses:
+        "200":
+          description: Poll + login endpoints minted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  poll:
+                    type: object
+                    properties:
+                      token: { type: string }
+                      endpoint: { type: string, format: uri }
+                  login: { type: string, format: uri }
+
+  /login/v2/grant:
+    post:
+      summary: Submit credentials against a login token (browser step)
+      operationId: loginFlowGrant
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [token, loginName, password]
+              properties:
+                token: { type: string }
+                loginName:
+                  type: string
+                  description: user_id (identity law — never email)
+                password: { type: string }
+      responses:
+        "200":
+          description: Credentials accepted; app password minted and staged for poll pickup
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  granted: { type: boolean, enum: [true] }
+        "401":
+          description: Unknown user or wrong password (indistinguishable — no existence leak)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Message" }
+        "403":
+          description: App-password cap reached (24 pending+collected per user)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Message" }
+        "404":
+          description: Unknown or expired login token
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Message" }
+
+  /login/v2/poll:
+    post:
+      summary: Poll for the minted app password (desktop-client step)
+      operationId: loginFlowPoll
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token: { type: string }
+      responses:
+        "200":
+          description: Flow completed — one-time app password returned, then invalidated server-side
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  server: { type: string, format: uri }
+                  loginName: { type: string }
+                  appPassword: { type: string }
+        "404":
+          description: Still pending, or token unknown/expired/already collected (same status — poll again or restart)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Message" }
+
+  /ocs/v2.php/core/getapppassword:
+    get:
+      summary: Mint an app password using the real account password
+      description: |
+        Real password in (Basic auth), one-time apppassword out. Each call
+        mints a NEW credential; existing credentials remain valid (no
+        rotation/revocation side effect).
+      operationId: getAppPassword
+      security: [{ basicAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/OcsApiRequest"
+        - name: format
+          in: query
+          required: true
+          schema: { type: string, enum: [json] }
+      responses:
+        "200":
+          description: New app password minted
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OcsEnvelope" }
+        "400":
+          description: format!=json
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OcsEnvelope" }
+        "401":
+          description: Missing/invalid Basic auth
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OcsEnvelope" }
+        "403":
+          description: |
+            Missing OCS-APIRequest header, OR app-password cap reached
+            (24 per user; both cases return statuscode 997/999 in the
+            OCS envelope, HTTP 403)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OcsEnvelope" }
+
+  /ocs/v2.php/cloud/user:
+    get:
+      summary: Current authenticated user
+      operationId: getCurrentUser
+      security: [{ basicAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/OcsApiRequest"
+        - name: format
+          in: query
+          required: true
+          schema: { type: string, enum: [json] }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OcsEnvelope" }
+        "401":
+          description: Missing/invalid Basic auth, or missing OCS-APIRequest header (both -> statuscode 997)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OcsEnvelope" }
+        "400":
+          description: format!=json
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OcsEnvelope" }
+
+  /ocs/v2.php/cloud/users/{userId}:
+    get:
+      summary: Look up a specific user (self only — no admin cross-user read)
+      operationId: getUserById
+      security: [{ basicAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/OcsApiRequest"
+        - name: format
+          in: query
+          required: true
+          schema: { type: string, enum: [json] }
+        - name: userId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK (only when userId == authenticated user)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OcsEnvelope" }
+        "403":
+          description: userId != authenticated user (real 403 here — this is not a path-identity DAV route)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OcsEnvelope" }
+        "401":
+          description: Missing/invalid Basic auth, or missing OCS-APIRequest header
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OcsEnvelope" }
+
+components:
+  securitySchemes:
+    basicAuth:
+      type: http
+      scheme: basic
+      description: user_id + app password (Argon2id verified, status='collected')
+  parameters:
+    OcsApiRequest:
+      name: OCS-APIRequest
+      in: header
+      required: true
+      schema: { type: string, enum: ["true"] }
+  schemas:
+    Message:
+      type: object
+      properties:
+        message: { type: string }
+    OcsEnvelope:
+      type: object
+      properties:
+        ocs:
+          type: object
+          properties:
+            meta:
+              type: object
+              properties:
+                status: { type: string, enum: [ok, failure] }
+                statuscode: { type: integer }
+                message: { type: string }
+                totalitems: { type: string }
+                itemsperpage: { type: string }
+            data:
+              nullable: true
+              oneOf:
+                - type: object
+                  description: current-user shape
+                  properties:
+                    id: { type: string }
+                    display-name: { type: string }
+                    email: { type: string, nullable: true }
+                    enabled: { type: boolean }
+                    quota:
+                      type: object
+                      properties:
+                        quota: { type: integer }
+                        used: { type: integer }
+                        free: { type: integer }
+                        total: { type: integer }
+                        relative: { type: integer }
+                - type: object
+                  description: getapppassword shape
+                  properties:
+                    apppassword: { type: string }

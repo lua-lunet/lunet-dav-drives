@@ -109,7 +109,7 @@ help:
 		'  Toolchain         .lunet/ (lunet $(LUNET_VERSION)), .tools/ (hurl $(HURL_VERSION), cyan, tested)' \
 		'  Generated Lua     build/' \
 		'  Schema            sql/schema.sql' \
-		'  HTTP contract     openapi.yaml' \
+		'  HTTP contracts    openapi.yaml (native), openapi/ (NCe31 work-alike)' \
 		'' \
 		'  KEEP_STACK=1 make e2e   Leave the server and containers up afterwards.'
 

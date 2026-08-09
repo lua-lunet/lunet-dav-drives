@@ -10,6 +10,10 @@ int sodium_base642bin(unsigned char *bin, size_t bin_maxlen,
                       const char *b64, size_t b64_len,
                       const char *ignore, size_t *bin_len,
                       const char **b64_end, int variant);
+size_t crypto_auth_hmacsha256_statebytes(void);
+int crypto_auth_hmacsha256_init(void *state, const unsigned char *key, size_t keylen);
+int crypto_auth_hmacsha256_update(void *state, const unsigned char *in, unsigned long long inlen);
+int crypto_auth_hmacsha256_final(void *state, unsigned char *out);
 ]]
 
 -- The C surface this module calls, so the FFI boundary is typed here rather
@@ -26,6 +30,13 @@ local record Sodium
       b64: string, b64_len: integer,
       ignore: ffi.cdata, bin_len: ffi.cdata,
       b64_end: ffi.cdata, variant: integer): integer
+
+   -- The streaming HMAC API is used rather than crypto_auth_hmacsha256, which
+   -- accepts only 32 byte keys. SigV4 signing keys vary in length.
+   crypto_auth_hmacsha256_statebytes: function(): integer
+   crypto_auth_hmacsha256_init: function(state: ffi.cdata, key: string, keylen: integer): integer
+   crypto_auth_hmacsha256_update: function(state: ffi.cdata, input: string, inlen: integer): integer
+   crypto_auth_hmacsha256_final: function(state: ffi.cdata, out: ffi.cdata): integer
 end
 
 local BASE64_VARIANT_ORIGINAL <const> = 1
@@ -45,18 +56,48 @@ end
 local lib = load_sodium()
 assert(lib.sodium_init() >= 0)
 
+-- Sized from the library itself rather than hardcoded, rounded up to whole
+-- 8 byte words.
+local HMAC_STATE_WORDS <const> =
+   math.floor((tonumber(lib.crypto_auth_hmacsha256_statebytes()) + 7) / 8)
+
 local record Crypto
+   to_hex: function(raw: string): string
 end
 
-function Crypto.sha256_hex(data: string): string
-   local out = ffi.new("unsigned char[?]", SHA256_BYTES)
-   lib.crypto_hash_sha256(out, data, #data)
-   local raw = ffi.string(out, SHA256_BYTES)
+local function to_hex(raw: string): string
    local hex = {}
    for i = 1, #raw do
       hex[i] = string.format("%02x", string.byte(raw, i))
    end
    return table.concat(hex)
+end
+
+Crypto.to_hex = to_hex
+
+function Crypto.sha256(data: string): string
+   local out = ffi.new("unsigned char[?]", SHA256_BYTES)
+   lib.crypto_hash_sha256(out, data, #data)
+   return ffi.string(out, SHA256_BYTES)
+end
+
+function Crypto.sha256_hex(data: string): string
+   return to_hex(Crypto.sha256(data))
+end
+
+-- Raw 32 byte MAC. Keys may be any length, which SigV4's chained derivation
+-- requires. The state buffer is allocated as uint64 so it is 8 byte aligned.
+function Crypto.hmac_sha256(key: string, data: string): string
+   local state = ffi.new("uint64_t[?]", HMAC_STATE_WORDS)
+   lib.crypto_auth_hmacsha256_init(state, key, #key)
+   lib.crypto_auth_hmacsha256_update(state, data, #data)
+   local out = ffi.new("unsigned char[?]", SHA256_BYTES)
+   lib.crypto_auth_hmacsha256_final(state, out)
+   return ffi.string(out, SHA256_BYTES)
+end
+
+function Crypto.hmac_sha256_hex(key: string, data: string): string
+   return to_hex(Crypto.hmac_sha256(key, data))
 end
 
 function Crypto.base64_encode(data: string): string
@@ -69,9 +110,10 @@ end
 function Crypto.base64_decode(data: string): string, string
    local out = ffi.new("unsigned char[?]", #data + 1)
    local out_len = ffi.new("size_t[1]")
-   local nothing = ffi.cast("const char *", nil)
+   local ignore = ffi.cast("const char *", nil)
+   local endp = ffi.new("const char *[1]")
    local rc = lib.sodium_base642bin(
-      out, #data, data, #data, nothing, out_len, nothing, BASE64_VARIANT_ORIGINAL)
+      out, #data, data, #data, ignore, out_len, endp, BASE64_VARIANT_ORIGINAL)
    if rc ~= 0 then
       return nil, "invalid base64"
    end

@@ -143,14 +143,3 @@ CREATE INDEX file_events_file_id_idx
     ON file_events (file_id, event_id);
 CREATE INDEX file_events_actor_idx
     ON file_events (actor_user_id, event_id);
-
--- Tracer-round scaffolding.
---
--- Proves the running server can read a value out of Postgres and return it over
--- HTTP. Delete this table alongside app/hello.tl, the /hello route, and
--- spec/hello.hurl once /health, /v1/me, and /v1/drives are real.
-CREATE TABLE hello_tracer (
-    id       BIGSERIAL PRIMARY KEY,
-    subject  TEXT NOT NULL,
-    CONSTRAINT hello_tracer_subject_valid CHECK (length(subject) > 0)
-);

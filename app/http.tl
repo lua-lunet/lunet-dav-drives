@@ -72,6 +72,36 @@ function Http.decode_basic_auth(header: string): string, string
    return user, secret
 end
 
+function Http.header_value(headers: {string: string}, name: string): string
+   if not headers then
+      return nil
+   end
+   return headers[name:lower()]
+end
+
+function Http.decode_path_segment(segment: string): string, string
+   if not segment then
+      return nil, "missing path segment"
+   end
+   local out = {}
+   local i = 1
+   while i <= #segment do
+      local c = segment:sub(i, i)
+      if c == "%" then
+         local hex = segment:sub(i + 1, i + 2)
+         if #hex < 2 or not hex:match("^[0-9a-fA-F][0-9a-fA-F]$") then
+            return nil, "invalid percent-encoding"
+         end
+         out[#out + 1] = string.char(tonumber(hex, 16) as integer)
+         i = i + 3
+      else
+         out[#out + 1] = c
+         i = i + 1
+      end
+   end
+   return table.concat(out)
+end
+
 function Http.response(status: integer, headers: {string: string}, body: string): string
    local parts: {string} = {
       "HTTP/1.1 " .. tostring(status) .. " " .. (status_text[status] or "OK") .. "\r\n",

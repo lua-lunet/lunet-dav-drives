@@ -2,8 +2,12 @@
 .env
 .env.local
 
-# Downloaded toolchain: lunet, hurl, and the luarocks tree. Owned by make init.
+# Downloaded toolchain: hurl and the luarocks tree. Owned by make init.
 .tools/
+
+# Project-local lunet runtime, installed and verified by the release fetcher.
+# Only .lunet/keep is tracked.
+.lunet/
 
 # Generated Lua from the Cyan build. Owned by make build.
 build/

@@ -2,6 +2,8 @@ CREATE TABLE users (
     user_id       TEXT PRIMARY KEY,
     email         TEXT NOT NULL UNIQUE,
     display_name  TEXT NOT NULL,
+    -- NCe31 compat: real-account password digest (Argon2id encoded). Nullable; the native API never reads it.
+    password_digest TEXT,
     ctime         TIMESTAMPTZ NOT NULL DEFAULT now(),
     mtime         TIMESTAMPTZ NOT NULL DEFAULT now(),
     CONSTRAINT users_user_id_valid CHECK (

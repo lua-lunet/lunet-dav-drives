@@ -23,6 +23,7 @@ DELETE_PERSONAL_BODY='delete personal'
 DELETE_DRIVE_BODY='delete drive'
 MOVE_BLOCKED_BODY='blocked move'
 MOVE_BODY='move me'
+FIXTURE_PASSWORD='fixture-password'
 
 body_length() {
    printf '%s' "$1" | wc -c | tr -d ' '
@@ -120,6 +121,9 @@ echo "loading sql/schema.sql"
 psql -X -v ON_ERROR_STOP=1 -q \
    -c 'DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;'
 psql -X -v ON_ERROR_STOP=1 -q -f "$ROOT/sql/schema.sql"
+
+echo "loading specs/seed.sql"
+psql -X -v ON_ERROR_STOP=1 -q -f "$ROOT/specs/seed.sql"
 
 echo "seeding users, teams, memberships, and app passwords"
 seed_user user1 user1@example.test "User One"
@@ -328,3 +332,17 @@ run_hurl spec/security.hurl \
    --variable drive_id=2
 
 echo "e2e ok"
+
+# NCe31 compat specs (issue #2). These run last, after every native spec and
+# verification step, so a compat failure can never mask a native result.
+# The compat specs take {{host}} as a full base URL — a different convention
+# from the native host+port variable pair; the hurl files are verbatim.
+echo "running specs/ NCe31 compat specs"
+"$HURL" --test "$ROOT/specs/loginflow/00_flow_v2.hurl" \
+   "$ROOT/specs/loginflow/01_errors.hurl" \
+   "$ROOT/specs/ocs/00_current_user.hurl" \
+   "$ROOT/specs/ocs/01_forbidden_and_headers.hurl" \
+   "$ROOT/specs/ocs/02_no_auth.hurl" \
+   "$ROOT/specs/ocs/03_getapppassword.hurl" \
+   --variable host="http://$APP_HOST:$APP_PORT" \
+   --variable fixture_password="$FIXTURE_PASSWORD"

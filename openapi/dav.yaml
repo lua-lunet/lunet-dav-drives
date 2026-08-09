@@ -1,0 +1,257 @@
+openapi: 3.0.3
+info:
+  title: Dav Drive — WebDAV (NCe31 team-folders wire subset)
+  version: "0.1.1"
+  description: |
+    The WebDAV surface, as actually implemented in app/nc31.lua and covered
+    by specs/dav/*.hurl. This is the NCe31 **team-folders** dialect, not the
+    generic groupfolders/ACL API: a team drive is a flat, top-level named
+    collection a user either is or isn't a member of. There is no nested
+    "Team Folders" special folder, no roles, no ACL matrix — membership is
+    a pure set relation granting the single team-drive capability.
+
+    Security boundary is flat and binary: personal space XOR one team drive
+    per blob. Non-membership and non-existence are indistinguishable on the
+    wire (404, never 403) at every layer — root-list filtering, direct-path
+    GET/PUT/PROPFIND/HEAD/DELETE probing, and cross-user access all collapse
+    to the same 404.
+
+    Namespace is flat: `/remote.php/dav/files/{user_id}/{name}` (personal
+    file) or `/remote.php/dav/files/{user_id}/{team_name}/{name}` (team
+    file). No deeper nesting is supported (409). Drives are administratively
+    provisioned (SQL) — MKCOL is unsupported (405).
+servers:
+  - url: http://localhost:8081
+
+paths:
+  /remote.php/dav/files/{userId}:
+    parameters:
+      - name: userId
+        in: path
+        required: true
+        schema: { type: string }
+        description: Authenticated user_id must equal this segment, else 404 (no existence leak)
+    options:
+      summary: Capability probe
+      operationId: davOptionsRoot
+      security: [{ basicAuth: [] }]
+      responses:
+        "200":
+          description: OK
+          headers:
+            Allow: { schema: { type: string } }
+            DAV: { schema: { type: string } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFoundNoLeak" }
+    x-propfind:
+      summary: Depth:1 root listing — personal files + visible member drives, flat
+      operationId: davPropfindRoot
+      description: |
+        Lists the user's own personal files AND every team drive they are a
+        member of, as flat top-level children (the team-folders shape).
+        Per-collection contained-file-count/contained-folder-count computed
+        via one aggregate query. A non-member never sees a drive they don't
+        belong to, and this filtering IS the enforced security boundary
+        (also independently enforced at direct-path level below).
+      responses:
+        "207": { $ref: "#/components/responses/MultiStatus" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFoundNoLeak" }
+    x-mkcol:
+      summary: Unsupported — drives are provisioned administratively (SQL), never by clients
+      operationId: davMkcolRoot
+      responses:
+        "405":
+          description: Unsupported
+          headers:
+            Allow: { schema: { type: string } }
+
+  /remote.php/dav/files/{userId}/{name}:
+    parameters:
+      - name: userId
+        in: path
+        required: true
+        schema: { type: string }
+      - name: name
+        in: path
+        required: true
+        schema: { type: string }
+        description: |
+          Either a personal-file name (flat, owner_user_id = userId) OR a
+          team_name (a drive the user is a member of, itself flat inside).
+          A single segment resolves this ambiguity by drive-name lookup
+          first, personal-file fallback second.
+    get:
+      summary: Read a personal file, or PROPFIND-equivalent info error on a drive segment
+      operationId: davGetPersonalOrDrive
+      security: [{ basicAuth: [] }]
+      responses:
+        "200":
+          description: File bytes
+          headers:
+            ETag: { schema: { type: string } }
+            Last-Modified: { schema: { type: string } }
+            OC-FileId: { schema: { type: string } }
+            OC-ETag: { schema: { type: string } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFoundNoLeak" }
+    head:
+      summary: Personal-file metadata probe
+      operationId: davHeadPersonal
+      security: [{ basicAuth: [] }]
+      responses:
+        "200": { description: OK }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFoundNoLeak" }
+    put:
+      summary: Create/overwrite a personal file (flat name, owner_user_id = userId)
+      operationId: davPutPersonal
+      security: [{ basicAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          "*/*": { schema: { type: string, format: binary } }
+      responses:
+        "201": { description: Created }
+        "204": { description: Overwritten }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFoundNoLeak" }
+        "409":
+          description: Name collides with a drive name, or PUT missing a file segment
+    delete:
+      summary: Delete a personal file
+      operationId: davDeletePersonal
+      security: [{ basicAuth: [] }]
+      responses:
+        "204": { description: Deleted }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFoundNoLeak" }
+    x-propfind:
+      summary: Personal-file props, or Depth:1 team-drive listing when {name} is a member drive
+      responses:
+        "207": { $ref: "#/components/responses/MultiStatus" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFoundNoLeak" }
+    x-proppatch:
+      summary: Patch dead props on a personal file
+      description: |
+        Custom-namespace dead props are writable via info.props. Reserved
+        namespaces (oc:, nc:, DAV:) are flat-rejected 403 for the whole
+        request (no partial application).
+      responses:
+        "207": { $ref: "#/components/responses/MultiStatus" }
+        "403": { description: "Reserved namespace (oc:/nc:/DAV:) in the request" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFoundNoLeak" }
+    copy:
+      summary: Unsupported
+      operationId: davCopyUnsupported
+      responses:
+        "409": { description: "COPY is not supported" }
+    x-mkcol:
+      summary: Unsupported at any depth — drives are admin-provisioned
+      responses:
+        "405": { description: Unsupported }
+
+  /remote.php/dav/files/{userId}/{teamName}/{name}:
+    parameters:
+      - name: userId
+        in: path
+        required: true
+        schema: { type: string }
+      - name: teamName
+        in: path
+        required: true
+        schema: { type: string }
+        description: Must be a drive the authenticated user is a member of, else 404
+      - name: name
+        in: path
+        required: true
+        schema: { type: string }
+        description: Flat file name inside the team drive (no further nesting — 409 beyond this depth)
+    get:
+      summary: Read a team-drive file (member-only; non-member -> 404, indistinguishable from non-existence)
+      operationId: davGetTeamFile
+      security: [{ basicAuth: [] }]
+      responses:
+        "200": { description: File bytes }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFoundNoLeak" }
+    head:
+      operationId: davHeadTeamFile
+      security: [{ basicAuth: [] }]
+      responses:
+        "200": { description: OK }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFoundNoLeak" }
+    put:
+      summary: Create/overwrite a team-drive file (member-only)
+      operationId: davPutTeamFile
+      security: [{ basicAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          "*/*": { schema: { type: string, format: binary } }
+      responses:
+        "201": { description: Created }
+        "204": { description: Overwritten }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFoundNoLeak" }
+    delete:
+      summary: Delete a team-drive file (member-only)
+      operationId: davDeleteTeamFile
+      security: [{ basicAuth: [] }]
+      responses:
+        "204": { description: Deleted }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFoundNoLeak" }
+    x-propfind:
+      summary: Team-drive file props (member-only)
+      responses:
+        "207": { $ref: "#/components/responses/MultiStatus" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFoundNoLeak" }
+    move:
+      summary: Same-location rename only (personal->personal, team->same team). Cross-location -> 409.
+      operationId: davMoveSameLocation
+      responses:
+        "201": { description: Renamed }
+        "409": { description: Cross-location move (unsupported) }
+        "404": { $ref: "#/components/responses/NotFoundNoLeak" }
+    x-mkcol:
+      responses:
+        "409": { description: "Nested paths are not supported beyond userId/teamName/name" }
+
+components:
+  securitySchemes:
+    basicAuth:
+      type: http
+      scheme: basic
+      description: user_id + app password (Argon2id verify, app_passwords.status='collected')
+  responses:
+    Unauthorized:
+      description: Missing/invalid Basic auth
+      headers:
+        WWW-Authenticate: { schema: { type: string } }
+      content:
+        application/xml:
+          schema: { $ref: "#/components/schemas/DavError" }
+    NotFoundNoLeak:
+      description: |
+        Not found. Covers: nonexistent path, wrong-user path segment
+        (auth user_id != path user_id), non-member drive access (root-list
+        AND direct-path), nonexistent drive. All indistinguishable — never 403.
+      content:
+        application/xml:
+          schema: { $ref: "#/components/schemas/DavError" }
+    MultiStatus:
+      description: Multi-Status (WebDAV 207) response body, per-prop 200/404 status
+      content:
+        application/xml:
+          schema: { type: string }
+  schemas:
+    DavError:
+      type: object
+      description: "SabreDAV-shaped: <d:error><s:exception/><s:message/></d:error>"
+      properties:
+        message: { type: string }

@@ -1,10 +1,12 @@
 -- Declarations for `lunet.httpc` provided by lunet-run.
 --
--- Verified by probing lunet v0.7.1 macos. The upstream release ships no type
--- declarations and no reference docs for this module, so everything below was
--- established empirically; see the notes on each field for what was actually
--- observed. Upstream issue: lua-lunet/lunet (asking for declarations and
--- reference docs for every module, with this file as the worked example).
+-- Verified by probing lunet v0.8.0 macos. As of v0.8.0 the upstream release
+-- ships official type declarations and reference docs for this module (see
+-- .lunet/v0.8.0/types/lunet/httpc.d.tl and the bundled HTTPC.md); everything
+-- below was established empirically before those existed, so see the notes on
+-- each field for what was actually observed. Upstream issue: lua-lunet/lunet
+-- (asking for declarations and reference docs for every module, with this file
+-- as the worked example).
 --
 -- NON-BLOCKING. httpc.request yields to the Lunet scheduler rather than
 -- blocking the process. Verified: with a request stalled against a blackholed

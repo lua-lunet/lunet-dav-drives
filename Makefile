@@ -6,9 +6,10 @@ ROCKS_DIR := $(TOOLS_DIR)/rocks
 BUILD_DIR := $(ROOT)/build
 TARGET_DIR := $(ROOT)/target
 
-LUNET_VERSION := v0.7.1
-LUNET_DIR := $(TOOLS_DIR)/lunet/$(LUNET_VERSION)/macos
+LUNET_VERSION := v0.8.0
+LUNET_DIR := $(ROOT)/.lunet/$(LUNET_VERSION)
 LUNET_RUN := $(LUNET_DIR)/lunet-run
+LUNET_FETCHER := $(ROOT)/lunet_fetch_release_$(LUNET_VERSION).lua
 
 HURL_VERSION := 8.0.1
 HURL_DIR := $(TOOLS_DIR)/hurl/$(HURL_VERSION)/hurl-$(HURL_VERSION)-aarch64-apple-darwin
@@ -105,7 +106,7 @@ help:
 		'  lunet-dav stacks so several can run on one machine at once.' \
 		'' \
 		'  Server            http://$(APP_HOST):$(APP_PORT)' \
-		'  Toolchain         .tools/ (lunet $(LUNET_VERSION), hurl $(HURL_VERSION), cyan, tested)' \
+		'  Toolchain         .lunet/ (lunet $(LUNET_VERSION)), .tools/ (hurl $(HURL_VERSION), cyan, tested)' \
 		'  Generated Lua     build/' \
 		'  Schema            sql/schema.sql' \
 		'  HTTP contract     openapi.yaml' \
@@ -128,14 +129,7 @@ init:
 		command -v $$cmd >/dev/null 2>&1 || { echo "ERROR: missing $$cmd; install it and rerun make init"; exit 1; }; \
 	done; \
 	mkdir -p $(TOOLS_DIR)/downloads $(ROCKS_DIR) $(TARGET_DIR) $(BUILD_DIR); \
-	if [ ! -x "$(LUNET_RUN)" ]; then \
-		echo "installing lunet $(LUNET_VERSION)"; \
-		tmp=$$(mktemp -d); \
-		curl -fsSL -o "$$tmp/lunet.tar.gz" "https://github.com/lua-lunet/lunet/releases/download/$(LUNET_VERSION)/lunet-macos.tar.gz"; \
-		rm -rf "$(LUNET_DIR)"; mkdir -p "$(LUNET_DIR)"; \
-		tar -xzf "$$tmp/lunet.tar.gz" -C "$(LUNET_DIR)" --strip-components=1; \
-		rm -rf "$$tmp"; \
-	fi; \
+	luajit $(LUNET_FETCHER); \
 	if [ ! -x "$(HURL)" ]; then \
 		echo "installing hurl $(HURL_VERSION)"; \
 		tmp=$$(mktemp -d); \
@@ -267,4 +261,4 @@ e2e-down:
 
 clean:
 	@set -e; \
-	rm -rf $(BUILD_DIR) $(TARGET_DIR) $(TOOLS_DIR)
+	rm -rf $(BUILD_DIR) $(TARGET_DIR) $(TOOLS_DIR) $(ROOT)/.lunet/$(LUNET_VERSION)

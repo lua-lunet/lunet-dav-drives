@@ -1,5 +1,5 @@
 -- Declarations for `lunet.postgres` provided by lunet-run.
--- Verified against lunet v0.7.1 macos: open takes a config table, query and
+-- Verified against lunet v0.8.0 macos: open takes a config table, query and
 -- exec both accept $n placeholders followed by their bind values, and rows come
 -- back as an array of column-name-keyed tables.
 

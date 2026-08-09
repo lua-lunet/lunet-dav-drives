@@ -1,0 +1,30 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install host tools
+        run: brew install luajit luarocks libsodium
+
+      - name: Install Lua tooling tree
+        run: |
+          luarocks --lua-version=5.1 --tree .tools/rocks install tl \
+            && luarocks --lua-version=5.1 --tree .tools/rocks install cyan \
+            && luarocks --lua-version=5.1 --tree .tools/rocks install tested
+
+      - name: Fetch lunet runtime
+        run: luajit lunet_fetch_release_v0.8.0.lua
+
+      - name: Build
+        run: make build
+
+      - name: Unit smoke
+        run: make unit

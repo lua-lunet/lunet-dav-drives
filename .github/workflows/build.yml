@@ -21,6 +21,8 @@ jobs:
             && luarocks --lua-version=5.1 --tree .tools/rocks install tested
 
       - name: Fetch lunet runtime
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: luajit lunet_fetch_release_v0.8.0.lua
 
       - name: Build

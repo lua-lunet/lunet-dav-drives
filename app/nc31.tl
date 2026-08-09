@@ -130,7 +130,11 @@ local function app_password_count(user_id: string): integer
    local rows, err = db.query(
       "SELECT COUNT(*) AS n FROM app_passwords WHERE user_id = $1", user_id)
    if err or not rows[1] then
-      return 0
+      -- Fail closed like verify_real_password/auth_app_password above: an
+      -- uncertain count must not read as "no passwords yet". Returning the
+      -- cap itself makes every `>= APP_PASSWORD_CAP` call site refuse rather
+      -- than silently allow unbounded minting during a DB hiccup.
+      return APP_PASSWORD_CAP
    end
    return (tonumber(rows[1].n) or 0) as integer
 end
@@ -163,8 +167,25 @@ local function flow_get(token: string): Flow
    return flow
 end
 
+-- flow_get only evicts the token it was asked for, so a flow that is
+-- initiated and then never polled or granted would otherwise sit in `flows`
+-- forever (initiate is anonymous and unauthenticated, so this table would
+-- otherwise grow without bound under repeated calls). Sweep expired entries
+-- opportunistically on every initiate call -- the only call that grows the
+-- table -- so steady-state size tracks live traffic within one TTL window
+-- instead of accumulating abandoned flows indefinitely.
+local function sweep_expired_flows()
+   local now = os.time()
+   for token, flow in pairs(flows) do
+      if flow.expires_at <= now then
+         flows[token] = nil
+      end
+   end
+end
+
 -- POST /index.php/login/v2 — anonymous initiate.
 local function handle_login_init(req: http.Request): string
+   sweep_expired_flows()
    local token = crypto.random_hex(32)
    local base = "http://" .. (req.headers.host or "localhost")
    flows[token] = {

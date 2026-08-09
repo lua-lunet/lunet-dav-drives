@@ -48,6 +48,15 @@ Authentication is HTTP Basic:
 - username = `user_id`
 - password = app-password plaintext secret
 
+## NCe31 compat surface
+
+Alongside the native API, the server carries a small Nextcloud 31 work-alike
+surface from issue #2: Login Flow v2, the OCS user/app-password endpoints, and
+a minimal DAV PROPFIND root. Its contracts are the legacy OpenAPI 3.0.3
+documents in [openapi/](./openapi/), carried verbatim, and the Hurl specs in
+[specs/](./specs/) pin the wire behaviour. The native API and data model are
+unchanged by it.
+
 ## Administration
 
 Users, Teams, memberships, and app passwords are intentionally CLI-managed for now.

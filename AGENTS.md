@@ -23,6 +23,16 @@ Architectural laws
 - Keep internal IDs stable and distinct from human-readable names.
 - Keep the implementation small; delete complexity when the model can be expressed directly.
 
+Compat surface: NCe31 work-alike (issue #2)
+
+- `app/nc31.tl` serves Login Flow v2 plus the OCS user/app-password surface; `app/nc31_dav.tl` serves one PROPFIND Depth:0 root sliver under `/remote.php/dav/files/{uid}/`.
+- The compat contracts are `openapi/auth.yaml` and `openapi/dav.yaml`: legacy OpenAPI 3.0.3 documents carried verbatim from issue #2. The native contract stays `openapi.yaml` (OpenAPI 3.1), unchanged.
+- Compat Hurl specs live in `specs/`, verbatim from the issue and never edited to pass, with fixtures in `specs/seed.sql` (users u1/u2; the fixture password is wired into `e2e/run-e2e.sh` as `FIXTURE_PASSWORD`).
+- The native API and data model are not warped to fit the compat surface: the model is open for extension (one additive nullable column, `users.password_digest`) and closed for modification.
+- Workalike, not a clone: unsupported surface is cleanly refused (404/405/409) and is never documented as supported.
+- Semantic authority for the wire dialect is https://docs.nextcloud.com/server/31/admin_manual/ .
+- Delivery: PRs gate on the required `build` check and squash-automerge to main.
+
 Build and test workflow
 
 ```text

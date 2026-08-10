@@ -99,20 +99,82 @@ local function auth_app_password(req: http.Request): AuthUser
    }
 end
 
+-- A precomputed dummy Argon2id digest. verify_real_password runs the KDF
+-- against it for unknown users and NULL digests, so the response timing is
+-- indistinguishable from a real wrong-password check (no existence oracle).
+-- Generated once at module load: a one-time ~100 ms startup cost that keeps
+-- the parameters identical to real digests even if libsodium defaults move.
+local DUMMY_DIGEST = crypto.argon2id("dummy-password-for-timing-equalization")
+
+-- Every real-password verify is a synchronous Argon2id call that blocks
+-- lunet's cooperative scheduler for ~50-100 ms, and both trigger paths
+-- (login/v2/grant, ocs getapppassword) are unauthenticated. That is an
+-- accepted alpha trade-off (no async KDF, no brute-force subsystem like
+-- Nextcloud's); what is NOT accepted is letting a serial request stream run
+-- the KDF unbounded. After ATTEMPT_MAX failures for one login name inside
+-- ATTEMPT_WINDOW_SECONDS, further attempts are refused before the KDF runs,
+-- until the window slides past or a verify succeeds. Ephemeral and
+-- opportunistically swept, like the flows table.
+local record Attempt
+   count: integer
+   window_start: integer
+end
+
+local attempts: {string: Attempt} = {}
+
+local ATTEMPT_MAX <const> = 8
+local ATTEMPT_WINDOW_SECONDS <const> = 600
+
+local function throttled(login_name: string): boolean
+   local a = attempts[login_name]
+   if not a then
+      return false
+   end
+   if os.time() - a.window_start >= ATTEMPT_WINDOW_SECONDS then
+      attempts[login_name] = nil
+      return false
+   end
+   return a.count >= ATTEMPT_MAX
+end
+
+local function record_failure(login_name: string)
+   local now = os.time()
+   for name, a in pairs(attempts) do
+      if now - a.window_start >= ATTEMPT_WINDOW_SECONDS then
+         attempts[name] = nil
+      end
+   end
+   local a = attempts[login_name]
+   if not a then
+      a = { count = 0, window_start = now }
+      attempts[login_name] = a
+   end
+   a.count = a.count + 1
+end
+
 -- Real-account-password check against users.password_digest (Argon2id). A
 -- NULL digest never matches, and an unknown user is indistinguishable from a
--- wrong password: no existence leak.
+-- wrong password: same 401 body, and same KDF timing via DUMMY_DIGEST.
 local function verify_real_password(login_name: string, password: string): boolean
+   if login_name == "" or throttled(login_name) then
+      return false
+   end
    local rows, err = db.query(
       "SELECT password_digest FROM users WHERE user_id = $1 LIMIT 1", login_name)
-   if err or not rows[1] then
-      return false
+   local real = not err and rows[1] ~= nil and type(rows[1].password_digest) == "string"
+   local digest = DUMMY_DIGEST
+   if real then
+      digest = rows[1].password_digest as string
    end
-   local digest = rows[1].password_digest
-   if type(digest) ~= "string" then
-      return false
+   -- The KDF always runs (timing), but the result only counts when a real
+   -- digest was present, so the dummy can never authenticate anyone.
+   local ok = real and crypto.argon2id_verify(digest, password)
+   if ok then
+      attempts[login_name] = nil
+   else
+      record_failure(login_name)
    end
-   return crypto.argon2id_verify(digest as string, password)
+   return ok
 end
 
 local function auth_real_password(req: http.Request): string
@@ -204,7 +266,7 @@ local function handle_login_init(req: http.Request): string
    })
 end
 
--- POST /login/v2/grant — the browser step. Unknown, expired, and
+-- POST /login/v2/grant — the browser step. Unknown, expired, in-flight, and
 -- already-granted tokens are the same 404; unknown user and wrong password
 -- are the same 401; the per-user app-password cap is 403.
 local function handle_login_grant(req: http.Request): string
@@ -213,15 +275,24 @@ local function handle_login_grant(req: http.Request): string
    if not flow or flow.state ~= "pending" then
       return message(404, "Unknown or expired login token")
    end
+   -- Claim before the first yield: verify/count/mint below are DB round trips
+   -- that yield the coroutine, and two concurrent grants of the same token
+   -- must not both mint (the loser's credential would be valid but never
+   -- delivered, silently burning a slot toward the cap). Any failure hands
+   -- the flow back to pending.
+   flow.state = "claimed"
    local login_name = form.loginName or ""
    if not verify_real_password(login_name, form.password or "") then
+      flow.state = "pending"
       return message(401, "Unknown user or wrong password")
    end
    if app_password_count(login_name) >= APP_PASSWORD_CAP then
+      flow.state = "pending"
       return message(403, "App password limit reached")
    end
    local secret, err = mint_app_password(login_name, "loginflow")
    if not secret then
+      flow.state = "pending"
       return message(500, err or "failed to mint app password")
    end
    flow.state = "granted"

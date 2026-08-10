@@ -54,16 +54,28 @@ local function auth_user_id(req: http.Request): string
    return tostring(rows[1].user_id)
 end
 
--- Minimal Depth:0 collection answer: the root's own props only. uid and path
--- are server-controlled ASCII (user_id forbids '/'), so no XML escaping.
+-- The schema CHECK on user_id forbids only '/', so XML metacharacters
+-- (<, &, quotes) are provisionable in principle. Escape everything emitted
+-- rather than relying on provisioning hygiene.
+local function xml_escape(s: string): string
+   return (s:gsub("[&<>\"']", {
+      ["&"] = "&amp;",
+      ["<"] = "&lt;",
+      [">"] = "&gt;",
+      ['"'] = "&quot;",
+      ["'"] = "&apos;",
+   }))
+end
+
+-- Minimal Depth:0 collection answer: the root's own props only.
 local function propfind_root(path: string, uid: string): string
    local body = '<?xml version="1.0" encoding="utf-8"?>\n'
       .. '<d:multistatus xmlns:d="DAV:">\n'
       .. '  <d:response>\n'
-      .. '    <d:href>' .. path .. '</d:href>\n'
+      .. '    <d:href>' .. xml_escape(path) .. '</d:href>\n'
       .. '    <d:propstat>\n'
       .. '      <d:prop>\n'
-      .. '        <d:displayname>' .. uid .. '</d:displayname>\n'
+      .. '        <d:displayname>' .. xml_escape(uid) .. '</d:displayname>\n'
       .. '        <d:resourcetype><d:collection/></d:resourcetype>\n'
       .. '      </d:prop>\n'
       .. '      <d:status>HTTP/1.1 200 OK</d:status>\n'

@@ -336,7 +336,9 @@ echo "e2e ok"
 # NCe31 compat specs (issue #2). These run last, after every native spec and
 # verification step, so a compat failure can never mask a native result.
 # The compat specs take {{host}} as a full base URL — a different convention
-# from the native host+port variable pair; the hurl files are verbatim.
+# from the native host+port variable pair. The six loginflow/ocs files are
+# verbatim (issue #2); specs/dav/00_sliver_refusals.hurl is ours, pinning the
+# sliver's refusal matrix until the issue #6 re-spec absorbs it.
 echo "running specs/ NCe31 compat specs"
 "$HURL" --test "$ROOT/specs/loginflow/00_flow_v2.hurl" \
    "$ROOT/specs/loginflow/01_errors.hurl" \
@@ -344,5 +346,6 @@ echo "running specs/ NCe31 compat specs"
    "$ROOT/specs/ocs/01_forbidden_and_headers.hurl" \
    "$ROOT/specs/ocs/02_no_auth.hurl" \
    "$ROOT/specs/ocs/03_getapppassword.hurl" \
+   "$ROOT/specs/dav/00_sliver_refusals.hurl" \
    --variable host="http://$APP_HOST:$APP_PORT" \
    --variable fixture_password="$FIXTURE_PASSWORD"

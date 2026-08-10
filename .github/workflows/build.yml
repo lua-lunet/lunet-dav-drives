@@ -3,7 +3,12 @@ name: build
 on:
   push:
     branches: [main]
+    tags: ['v*']
   pull_request:
+
+# publish-release needs to create the GitHub release (contents: write).
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -30,3 +35,44 @@ jobs:
 
       - name: Unit smoke
         run: make unit
+
+      # The shippable unit of this repo is the Cyan-compiled Lua tree plus
+      # the schema, the OpenAPI contracts, and the Hurl proofs. The lunet
+      # runtime itself is fetched per project via lunet_fetch_release.
+      - name: Package app archive
+        run: |
+          tar -czf lunet-dav-drives-app.tar.gz \
+            build sql openapi.yaml openapi spec specs AGENTS.md README.md
+
+      - name: Upload app archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-app
+          path: lunet-dav-drives-app.tar.gz
+          if-no-files-found: error
+
+  # Same tag-publish approach as upstream lua-lunet/lunet: the build job
+  # gates, and the release job only runs for v* tag pushes.
+  publish-release:
+    name: Publish release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download app archive
+        uses: actions/download-artifact@v4
+        with:
+          name: release-app
+          path: release-assets
+
+      - name: Name the archive for the tag
+        run: |
+          mv release-assets/lunet-dav-drives-app.tar.gz \
+            "release-assets/lunet-dav-drives-${GITHUB_REF_NAME}.tar.gz"
+
+      - name: Create or update GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.ref_name }}
+          generate_release_notes: true
+          files: release-assets/lunet-dav-drives-${{ github.ref_name }}.tar.gz

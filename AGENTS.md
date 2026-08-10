@@ -33,6 +33,7 @@ Compat surface: NCe31 work-alike (issue #2)
 - Workalike, not a clone: unsupported surface is cleanly refused (404/405/409) and is never documented as supported.
 - Semantic authority for the wire dialect is https://docs.nextcloud.com/server/31/admin_manual/ .
 - Delivery: PRs gate on the required `build` check and squash-automerge to main.
+- Releases: pushing a `v*` tag re-runs the `build` job and a `publish-release` job creates the GitHub release (compiled-app tarball plus auto-generated notes) — the same tag-driven approach as upstream lua-lunet/lunet. The tag is the version marker; there is no version file to bump (alpha: 0.x.y breaking semver).
 
 Build and test workflow
 

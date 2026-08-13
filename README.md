@@ -70,10 +70,6 @@ wired in with `/v1/me`.
 ```sh
 make init
 make db-reset
-luajit build/tools/admin.lua user add user7 user7@example.test "User Seven"
-luajit build/tools/admin.lua team add A A
-luajit build/tools/admin.lua team member-add A user7
-luajit build/tools/admin.lua app-password mint user7 test
 ```
 
 ## Storage

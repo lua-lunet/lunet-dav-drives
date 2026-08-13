@@ -6,7 +6,7 @@ ROCKS_DIR := $(TOOLS_DIR)/rocks
 BUILD_DIR := $(ROOT)/build
 TARGET_DIR := $(ROOT)/target
 
-LUNET_VERSION := v0.8.0
+LUNET_VERSION := v0.9.2
 LUNET_DIR := $(ROOT)/.lunet/$(LUNET_VERSION)
 LUNET_RUN := $(LUNET_DIR)/lunet-run
 LUNET_FETCHER := $(ROOT)/lunet_fetch_release_$(LUNET_VERSION).lua

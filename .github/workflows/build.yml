@@ -19,11 +19,14 @@ jobs:
       - name: Install host tools
         run: brew install luajit luarocks libsodium
 
+      # Rock versions are pinned to the toolchain the repo is verified
+      # against: an unpinned `install tested` picked up 0.5.0, whose API
+      # broke the unit smoke (tested.test removed).
       - name: Install Lua tooling tree
         run: |
-          luarocks --lua-version=5.1 --tree .tools/rocks install tl \
-            && luarocks --lua-version=5.1 --tree .tools/rocks install cyan \
-            && luarocks --lua-version=5.1 --tree .tools/rocks install tested
+          luarocks --lua-version=5.1 --tree .tools/rocks install tl 0.24.8-1 \
+            && luarocks --lua-version=5.1 --tree .tools/rocks install cyan 0.4.1-1 \
+            && luarocks --lua-version=5.1 --tree .tools/rocks install tested 0.3.0-1
 
       - name: Fetch lunet runtime
         env:

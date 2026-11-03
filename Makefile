@@ -115,6 +115,9 @@ help:
 
 # ---------------------------------------------------------------------------
 # init installs or verifies every dependency: build, test, and runtime.
+# The Lua rocks are version-pinned: an unpinned `install tested` picked up
+# a new major whose API broke the unit smoke on CI (0.5.0 removed
+# tested.test). Pin to the versions the toolchain is verified against.
 # When adding a dependency, add its bootstrap here.
 # ---------------------------------------------------------------------------
 init:
@@ -138,10 +141,11 @@ init:
 		tar -xzf "$$tmp/hurl.tar.gz" -C "$(TOOLS_DIR)/hurl/$(HURL_VERSION)"; \
 		rm -rf "$$tmp"; \
 	fi; \
-	for rock in tl cyan tested; do \
+	for pair in "tl 0.24.8-1" "cyan 0.4.1-1" "tested 0.3.0-1"; do \
+		rock=$$(echo $$pair | cut -d' ' -f1); \
 		if ! $(LUAROCKS) list --porcelain $$rock 2>/dev/null | grep -q "^$$rock"; then \
-			echo "installing rock $$rock"; \
-			$(LUAROCKS) install $$rock; \
+			echo "installing rock $$pair"; \
+			$(LUAROCKS) install $$pair; \
 		fi; \
 	done; \
 	if ! luajit -e 'require("ffi").load("sodium")' >/dev/null 2>&1; then \

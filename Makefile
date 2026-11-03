@@ -6,7 +6,7 @@ ROCKS_DIR := $(TOOLS_DIR)/rocks
 BUILD_DIR := $(ROOT)/build
 TARGET_DIR := $(ROOT)/target
 
-LUNET_VERSION := v0.9.2
+LUNET_VERSION := v0.18.2
 LUNET_DIR := $(ROOT)/.lunet/$(LUNET_VERSION)
 LUNET_RUN := $(LUNET_DIR)/lunet-run
 LUNET_FETCHER := $(ROOT)/lunet_fetch_release_$(LUNET_VERSION).lua
@@ -28,7 +28,7 @@ APP_PORT ?= 18080
 SERVER_PID := $(TARGET_DIR)/server.pid
 SERVER_LOG := $(TARGET_DIR)/server.log
 
-.PHONY: help init deps check-minio build unit start stop restart status test e2e e2e-up e2e-down db-reset clean
+.PHONY: help init deps check-s3 build unit start stop restart status test e2e e2e-up e2e-down db-reset clean
 
 # A bare `make` explains itself rather than doing anything.
 .DEFAULT_GOAL := help
@@ -39,7 +39,7 @@ SERVER_LOG := $(TARGET_DIR)/server.log
 # values must reach recipe subprocesses rather than staying make-only.
 export APP_HOST APP_PORT
 export PGHOST PGPORT PGDATABASE PGUSER PGPASSWORD
-export MINIO_ENDPOINT MINIO_ROOT_USER MINIO_ROOT_PASSWORD MINIO_BUCKET MINIO_REGION
+export S3_ENDPOINT S3_BUCKET S3_REGION S3_ACCESS_KEY_ID S3_SECRET_ACCESS_KEY
 
 help:
 	@printf '%s\n' \
@@ -89,7 +89,7 @@ help:
 		'' \
 		'STACK AND DATA' \
 		'' \
-		'  make e2e-up     Bring up postgres and minio and leave them running.' \
+		'  make e2e-up     Bring up postgres and garage and leave them running.' \
 		'  make e2e-down   Tear the docker stack down.' \
 		'  make db-reset   Drop the public schema and reload sql/schema.sql.' \
 		'                  Destroys all local data.' \
@@ -170,15 +170,15 @@ deps:
 		|| fail "libsodium is not loadable; app/crypto.tl needs it for password digests"; \
 	command -v psql >/dev/null 2>&1 || fail "psql not on PATH"; \
 	command -v docker >/dev/null 2>&1 || fail "docker not on PATH"; \
-	docker info >/dev/null 2>&1 || fail "the docker daemon is not running; postgres and minio come from e2e/docker-compose.yml"; \
+	docker info >/dev/null 2>&1 || fail "the docker daemon is not running; postgres and garage come from e2e/docker-compose.yml"; \
 	echo "deps ok"
 
-# minio is only reachable once the stack is up, so it is checked here rather
+# garage is only reachable once the stack is up, so it is checked here rather
 # than in deps, which must stay fast and runnable before anything is running.
-check-minio:
+check-s3:
 	@set -e; \
-	curl -fsS "$${MINIO_ENDPOINT}/minio/health/ready" >/dev/null 2>&1 \
-		|| { echo "ERROR: the object store is not answering at $${MINIO_ENDPOINT}"; \
+	curl -fsS "http://127.0.0.1:19011/health" >/dev/null 2>&1 \
+		|| { echo "ERROR: the object store is not answering at http://127.0.0.1:19011"; \
 		     echo "run: make e2e-up   (or: make init)"; exit 1; }
 
 # ---------------------------------------------------------------------------

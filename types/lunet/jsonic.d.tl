@@ -1,5 +1,5 @@
 -- Declarations for `lunet.jsonic` provided by lunet-run.
--- Verified against lunet v0.8.0 macos.
+-- Verified against lunet v0.18.2 macos.
 
 local record jsonic
    version: string

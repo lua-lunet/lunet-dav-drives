@@ -1,6 +1,6 @@
 -- Declarations for `lunet.httpc` provided by lunet-run.
 --
--- Verified by probing lunet v0.8.0 macos. As of v0.8.0 the upstream release
+-- Verified by probing lunet v0.18.2 macos. As of v0.8.0 the upstream release
 -- ships official type declarations and reference docs for this module (see
 -- .lunet/v0.8.0/types/lunet/httpc.d.tl and the bundled HTTPC.md); everything
 -- below was established empirically before those existed, so see the notes on

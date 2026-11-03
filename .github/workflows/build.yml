@@ -28,7 +28,7 @@ jobs:
       - name: Fetch lunet runtime
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: luajit lunet_fetch_release_v0.9.2.lua
+        run: luajit lunet_fetch_release_v0.18.2.lua
 
       - name: Build
         run: make build

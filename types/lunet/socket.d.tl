@@ -1,5 +1,5 @@
 -- Declarations for `lunet.socket` provided by lunet-run.
--- Verified against lunet v0.9.2 macos.
+-- Verified against lunet v0.18.2 macos.
 
 local record socket
    -- Opaque listener and connection handles (userdata at runtime).

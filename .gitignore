@@ -20,9 +20,6 @@ target/
 tmp/
 e2e/.tmp/
 
-# Local agent-tool state.
-.codex/
-
 # Coverage output from `tested --coverage`.
 luacov.stats.out
 luacov.report.out

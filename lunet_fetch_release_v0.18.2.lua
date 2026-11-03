@@ -135,10 +135,20 @@ end
 -- asset can never match a different asset's digest.
 local function fetch_expected_digest(asset)
 	local api = "https://api.github.com/repos/" .. REPO .. "/releases/tags/" .. RELEASE_TAG
+	-- CI runners share egress IPs, so the unauthenticated api.github.com rate
+	-- limit (60/hr) is routinely exhausted there (403). Authenticate when a
+	-- token is present (GITHUB_TOKEN in Actions; GH_TOKEN locally); local runs
+	-- without a token behave exactly as before.
+	local auth = ""
+	local token = os.getenv("GITHUB_TOKEN") or os.getenv("GH_TOKEN")
+	if token and token ~= "" then
+		auth = ' -H "Authorization: Bearer ' .. token .. '"'
+	end
 	local json = capture(
 		'curl -fsSL --connect-timeout 10 --max-time 30'
 			.. ' -H "Accept: application/vnd.github+json"'
 			.. ' -H "User-Agent: lunet-fetch-release"'
+			.. auth
 			.. ' "' .. api .. '"'
 	)
 	if not json or json == "" then

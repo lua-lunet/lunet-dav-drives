@@ -1,0 +1,23 @@
+[book]
+title = "lunet-dav-drives"
+description = "A small document-storage service built around flat shared Drives, on the lunet runtime: a Teal/Cyan codebase whose Hurl specs against the real running server are the measure of done."
+authors = ["Simon Massey"]
+language = "en"
+src = "docs/src"
+
+[build]
+build-dir = "_book"
+create-missing = false
+
+[output.html]
+# The site is served from a subpath of the Pages host. mdBook emits
+# root-relative asset URLs only when `site-url` is set; leaving it unset
+# keeps every generated link relative, which is what a subpath deployment
+# needs.
+default-theme = "light"
+preferred-dark-theme = "navy"
+git-repository-url = "https://github.com/lua-lunet/lunet-dav-drives"
+edit-url-template = "https://github.com/lua-lunet/lunet-dav-drives/edit/main/docs/src/{path}"
+
+[output.html.search]
+enable = true

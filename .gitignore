@@ -12,6 +12,9 @@
 # Generated Lua from the Cyan build. Owned by make build.
 build/
 
+# Built mdBook. Owned by the pages workflow / `mdbook build`.
+_book/
+
 # Runtime scratch: server pid, server log, e2e secrets. Owned by make start.
 target/
 

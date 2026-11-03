@@ -1,0 +1,29 @@
+# Garage single-node config for the e2e stack (see docker-compose.yml).
+#
+# The S3 API is published to the host on 127.0.0.1:19010 (this repo's e2e
+# port scheme); the admin API answers inside the compose network on :3903
+# and on the host at 127.0.0.1:19011 for `make check-s3`.
+metadata_dir = "/var/lib/garage/meta"
+data_dir = "/var/lib/garage/data"
+db_engine = "lmdb"
+
+replication_factor = 1
+
+rpc_bind_addr = "[::]:3901"
+rpc_public_addr = "127.0.0.1:3901"
+rpc_secret = "e2ee2ee2ee2ee2ee2ee2ee2ee2ee2ee2ee2ee2ee2ee2ee2ee2ee2ee2ee2ee2ee"
+
+[s3_api]
+s3_region = "garage"
+api_bind_addr = "[::]:3900"
+root_domain = ".s3.garage.localhost"
+
+[s3_web]
+bind_addr = "[::]:3902"
+root_domain = ".web.garage.localhost"
+index = "index.html"
+
+[admin]
+api_bind_addr = "[::]:3903"
+admin_token = "e2e-admin-token-not-secret"
+metrics_token = "e2e-metrics-token-not-secret"

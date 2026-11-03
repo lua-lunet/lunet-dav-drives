@@ -56,11 +56,16 @@ seed_member() {
 verify_object() {
    expected_body=$1
    expected_key=$2
-   $COMPOSE run --rm -e EXPECTED_BODY="$expected_body" -e EXPECTED_KEY="$expected_key" \
-      --entrypoint /bin/sh minio-init -c '
+   docker run --rm --network lunet-dav-drives-e2e_default \
+      -e EXPECTED_BODY="$expected_body" -e EXPECTED_KEY="$expected_key" \
+      -e AWS_ACCESS_KEY_ID="$S3_ACCESS_KEY_ID" \
+      -e AWS_SECRET_ACCESS_KEY="$S3_SECRET_ACCESS_KEY" \
+      -e AWS_DEFAULT_REGION="$S3_REGION" \
+      -e AWS_EC2_METADATA_DISABLED=true \
+      --entrypoint /bin/sh amazon/aws-cli -c '
          set -e
-         mc alias set e2e http://minio:9000 minioadmin minioadmin >/dev/null
-         actual=$(mc cat "e2e/lunet-dav-drives/$EXPECTED_KEY")
+         actual=$(aws --endpoint-url http://garage:3900 s3 cp \
+            "s3://lunet-dav-drives/$EXPECTED_KEY" - --no-progress)
          [ "$actual" = "$EXPECTED_BODY" ]
       '
 }
@@ -89,8 +94,8 @@ run_auth() {
 
 case "${1:-}" in
    up)
-      $COMPOSE up -d --wait postgres minio
-      $COMPOSE run --rm minio-init
+      $COMPOSE up -d --wait postgres garage
+      $COMPOSE run --rm s3init
       exit 0
       ;;
    down)
@@ -114,8 +119,17 @@ set +a
 
 LUAJIT=$(command -v luajit)
 
-$COMPOSE up -d --wait postgres minio
-$COMPOSE run --rm minio-init
+$COMPOSE up -d --wait postgres garage
+$COMPOSE run --rm s3init
+
+# The s3init one-shot generates (and reuses) the e2e S3 key in the s3creds
+# volume; read it back so the app server inherits real credentials.
+s3_creds=$($COMPOSE run --rm --entrypoint /bin/sh s3init -c 'cat /creds/s3.env')
+S3_ACCESS_KEY_ID=$(printf '%s\n' "$s3_creds" | sed -n 's/^S3_ACCESS_KEY_ID=//p')
+S3_SECRET_ACCESS_KEY=$(printf '%s\n' "$s3_creds" | sed -n 's/^S3_SECRET_ACCESS_KEY=//p')
+[ -n "$S3_ACCESS_KEY_ID" ] && [ -n "$S3_SECRET_ACCESS_KEY" ] \
+   || { echo "s3init produced no credentials"; exit 1; }
+export S3_ACCESS_KEY_ID S3_SECRET_ACCESS_KEY
 
 echo "loading sql/schema.sql"
 psql -X -v ON_ERROR_STOP=1 -q \
@@ -164,7 +178,7 @@ mint_password user7 e2e
 mint_password user8 e2e
 mint_password user9 e2e
 
-make -C "$ROOT" check-minio
+make -C "$ROOT" check-s3
 make -C "$ROOT" start
 
 "$HURL" --test "$ROOT/spec/health.hurl" \

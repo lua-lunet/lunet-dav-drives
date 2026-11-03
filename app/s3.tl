@@ -21,12 +21,12 @@ end
 local TIMEOUT_MS <const> = 5000
 
 local function config(): string, string, sigv4.Credentials
-   local endpoint = os.getenv("MINIO_ENDPOINT") or "http://127.0.0.1:19010"
-   local bucket = os.getenv("MINIO_BUCKET") or "lunet-dav-drives"
+   local endpoint = os.getenv("S3_ENDPOINT") or "http://127.0.0.1:19010"
+   local bucket = os.getenv("S3_BUCKET") or "lunet-dav-drives"
    return endpoint, bucket, {
-      access_key = os.getenv("MINIO_ROOT_USER") or "minioadmin",
-      secret_key = os.getenv("MINIO_ROOT_PASSWORD") or "minioadmin",
-      region = os.getenv("MINIO_REGION") or "us-east-1",
+      access_key = os.getenv("S3_ACCESS_KEY_ID") or "",
+      secret_key = os.getenv("S3_SECRET_ACCESS_KEY") or "",
+      region = os.getenv("S3_REGION") or "garage",
    }
 end
 
@@ -52,7 +52,7 @@ function S3.get_object(key: string): string, string
    local endpoint, bucket, creds = config()
    local scheme, host = split_endpoint(endpoint)
    if not scheme then
-      return nil, "MINIO_ENDPOINT is not a http(s) URL: " .. endpoint
+      return nil, "S3_ENDPOINT is not a http(s) URL: " .. endpoint
    end
 
    local path = "/" .. bucket .. "/" .. key
@@ -90,7 +90,7 @@ function S3.head_object(key: string): {httpc.Header}, string
    local endpoint, bucket, creds = config()
    local scheme, host = split_endpoint(endpoint)
    if not scheme then
-      return nil, "MINIO_ENDPOINT is not a http(s) URL: " .. endpoint
+      return nil, "S3_ENDPOINT is not a http(s) URL: " .. endpoint
    end
    local path = "/" .. bucket .. "/" .. key
    local amz_date = os.date("!%Y%m%dT%H%M%SZ") as string
@@ -125,7 +125,7 @@ function S3.put_object(key: string, body: string, content_type: string): string,
    local endpoint, bucket, creds = config()
    local scheme, host = split_endpoint(endpoint)
    if not scheme then
-      return nil, "MINIO_ENDPOINT is not a http(s) URL: " .. endpoint
+      return nil, "S3_ENDPOINT is not a http(s) URL: " .. endpoint
    end
    local path = "/" .. bucket .. "/" .. key
    local amz_date = os.date("!%Y%m%dT%H%M%SZ") as string
@@ -164,7 +164,7 @@ function S3.delete_object(key: string): boolean, string
    local endpoint, bucket, creds = config()
    local scheme, host = split_endpoint(endpoint)
    if not scheme then
-      return false, "MINIO_ENDPOINT is not a http(s) URL: " .. endpoint
+      return false, "S3_ENDPOINT is not a http(s) URL: " .. endpoint
    end
    local path = "/" .. bucket .. "/" .. key
    local amz_date = os.date("!%Y%m%dT%H%M%SZ") as string

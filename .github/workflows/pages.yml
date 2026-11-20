@@ -22,10 +22,14 @@ on:
 permissions:
   contents: read
 
-# One deployment at a time; the last push to main is the one that ships.
+# A newer run for the same ref supersedes the run still in flight, so the
+# mdBook build (`cargo install mdbook --locked` plus the book) is never
+# billed twice for a commit that is already superseded. Only the newest
+# commit's site ships. Pull-request and tag refs get their own groups, so
+# they can never cancel a `main` deployment.
 concurrency:
-  group: pages
-  cancel-in-progress: false
+  group: pages-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:

@@ -10,6 +10,14 @@ on:
 permissions:
   contents: write
 
+# A newer push for the same ref supersedes the run still in flight: both jobs
+# are hosted runners and the macOS build is the expensive one, so the stale
+# run is cancelled rather than billed twice. Tag pushes get their own group
+# (`refs/tags/v...`), so a release build is never cancelled by a later push.
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     timeout-minutes: 25

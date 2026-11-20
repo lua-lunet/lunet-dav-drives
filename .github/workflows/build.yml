@@ -10,8 +10,17 @@ on:
 permissions:
   contents: write
 
+# A newer push for the same ref supersedes the run still in flight: both jobs
+# are hosted runners and the macOS build is the expensive one, so the stale
+# run is cancelled rather than billed twice. Tag pushes get their own group
+# (`refs/tags/v...`), so a release build is never cancelled by a later push.
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
+    timeout-minutes: 25
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -57,6 +66,7 @@ jobs:
   # Same tag-publish approach as upstream lua-lunet/lunet: the build job
   # gates, and the release job only runs for v* tag pushes.
   publish-release:
+    timeout-minutes: 25
     name: Publish release
     if: startsWith(github.ref, 'refs/tags/v')
     needs: [build]
